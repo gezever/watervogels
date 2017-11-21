@@ -37,7 +37,8 @@ ui <- bootstrapPage(
               #selectInput("waarnemer", "kies de waarnemer", choices=sort(unique(waarnemingen$identifiedBy) )),
               selectInput("waarnemer", "kies de waarnemer", choices=waarnemers ),
               #selectInput("colors", "Kleurenschema",  rownames(subset(brewer.pal.info, category %in% c("seq", "div")))  ),
-                checkboxInput("legend", "Show legend", TRUE)
+                checkboxInput("legend", "Show legend", TRUE),
+              textOutput("message", container = h3)
                
   )
 )
@@ -45,6 +46,7 @@ ui <- bootstrapPage(
 server <- function(input, output, session) {
   
   
+  v <- reactiveValues(msg = "")
   
   data_of_click <- reactiveValues(clickedMarker=NULL)
   
@@ -73,6 +75,7 @@ server <- function(input, output, session) {
     # won't need to change dynamically (at least, not unless the
     # entire map is being torn down and recreated).
     topoData <- readLines("data/V3/localities.geojson") 
+
     leaflet() %>% 
       addTiles(attribution = 'Data <a href="http://dataset.inbo.be/watervogels-occurrences">http://dataset.inbo.be/watervogels-occurrences</a>'  ) %>% 
       #addProviderTiles(providers$Stamen.TonerLite ) %>%
@@ -107,24 +110,38 @@ server <- function(input, output, session) {
     data_of_click$clickedMarker <- input$map_marker_click
   })
   
+  observeEvent(input$map_geojson_click, {
+    v$msg <- paste("Clicked on", input$map_geojson_click)
+  })
 
+  output$message <- renderText(v$msg)
+  
+  
   # Make a barplot or scatterplot depending of the selected point
   output$plot=renderPlotly({
   #output$plot=renderPlot({
     my_waarnemingen <- subset(waarnemingen, waarnemingen$id == data_of_click$clickedMarker$id )
     my_lat <- head(my_waarnemingen$decimalLatitude,1)
     my_lon <- head(my_waarnemingen$decimalLongitude,1)
-    x <- list(  title = "" )
-    y <- list(  title = "Aantal vogels" )
-    
+
+   
     
     my_filteredwaarnemingen <- waarnemingen[as.Date(waarnemingen$eventDate) >= as.Date(input$tijdstip[1]) & as.Date(waarnemingen$eventDate) <= as.Date(input$tijdstip[2]) & waarnemingen$decimalLongitude==my_lon & waarnemingen$decimalLatitude==my_lat & waarnemingen$vernacularName== input$soort,]
     my_location <- my_filteredwaarnemingen$verbatimLocality[1]
+    # aantal_vogels <- my_filteredwaarnemingen$individualCount
+    # datums <- strptime(as.character(as.Date(my_filteredwaarnemingen$eventDate)),"%y/%m/%d")
+    # tellingen <- data.frame(date=datums,aantal_vogels)
+    # daterange=c(as.POSIXlt(min(tellingen$date)),as.POSIXlt(max(tellingen$date)))
+    
 
     #ggplot(data = my_filteredwaarnemingen, aes(x = eventDate, y = individualCount)) +      geom_bar(stat="identity") + geom_smooth(method = "lm")
  
+    # plot(tellingen,aantal_vogels,xaxt="n",ylab="KWH/day")          #don't plot the x axis
+    # axis.POSIXct(1, at=seq(daterange[1], daterange[2], by="month"), format="%b") #label the x axis by months
+   plot_ly(my_filteredwaarnemingen, x = ~eventDate) %>%    
+     #axis.POSIXct(1, at=seq(daterange[1], daterange[2], by="month"), format="%b") %>%  
+     add_markers(y = ~individualCount)  %>%
 
-   plot_ly(my_filteredwaarnemingen, x = ~eventDate) %>%      add_markers(y = ~individualCount)  %>% layout(xaxis = x, yaxis = y) %>%
      layout(title = paste(my_location, "\n" , input$tijdstip[1], "-", input$tijdstip[2]),
              paper_bgcolor='rgb(255,255,255)', plot_bgcolor='rgb(229,229,229)',
              xaxis = list(title = "Datum",
