@@ -3,22 +3,20 @@ library(leaflet)
 library(RColorBrewer)
 library(ggplot2)
 library(plotly)
+library(leaflet.extras)
 
 
 
 # zie https://rstudio.github.io/leaflet/shiny.html
 # klikken op een bol en dan plot: http://www.r-graph-gallery.com/2017/03/14/4-tricks-for-working-with-r-leaflet-and-shiny/
-
-#waarnemingen <- readRDS("data/occurrence.rds")
 waarnemingen <- readRDS("data/V3/occurrence.rds")
-# we sorteren hier Descending, zodat de kleinste bollen bovenaan liggen
+
 waarnemingen <-waarnemingen[waarnemingen$municipality == "Kalmthout" | waarnemingen$municipality == "Brecht" | waarnemingen$municipality == "Schoten",]
 #waarnemingen <-waarnemingen[waarnemingen$verbatimLocality == "De Moerkens KALMTHOUT" | waarnemingen$verbatimLocality == "Stappersven KALMTHOUT" | waarnemingen$verbatimLocality == "Drielingenven KALMTHOUT"  | waarnemingen$verbatimLocality == "Biezenkuilen KALMTHOUT" ,]
+
+# we sorteren hier Descending, zodat de kleinste bollen bovenaan liggen
 waarnemingen <-waarnemingen[order(-waarnemingen$individualCount),]
 
-# waarnemers <- waarnemingen$identifiedBy
-# saveRDS(file = "data/waarnemers.rds", waarnemers)
-# write.csv(file = "data/waarnemers.csv", waarnemers)
 waarnemers <- read.csv(file = "data/waarnemers_kalmthout.csv", header = TRUE)
 
 ui <- bootstrapPage(
@@ -33,6 +31,7 @@ ui <- bootstrapPage(
                
               # plotOutput("plot", height="300px"),
                plotlyOutput("plot"),
+              #plotOutput("plot2"),
               selectInput("soort", "Kies de soort", choices=sort(unique(waarnemingen$vernacularName) )),
               #selectInput("waarnemer", "kies de waarnemer", choices=sort(unique(waarnemingen$identifiedBy) )),
               selectInput("waarnemer", "kies de waarnemer", choices=waarnemers ),
@@ -81,9 +80,10 @@ server <- function(input, output, session) {
       #addProviderTiles(providers$Stamen.TonerLite ) %>%
       
       addGeoJSON(topoData, weight = 1, color = "#444444", fill = TRUE) %>%
+      
       #addTiles(        urlTemplate = "//{s}.tiles.mapbox.com/v3/jcheng.map-5ebohr46/{z}/{x}/{y}.png",        attribution = 'Maps by <a href="http://www.mapbox.com/">Mapbox</a>'      ) %>%
      setView(lng = 4.5809, lat = 51.3535, zoom = 12)
-    #setView(lng = 4.433277, lat = 51.408484, zoom = 14)
+
   })
   
   # Incremental changes to the map (in this case, replacing the
@@ -96,10 +96,13 @@ server <- function(input, output, session) {
       clearShapes() %>%
         clearMarkerClusters() %>%
         clearMarkers() %>%
-        
+       
         #addCircles(radius = ~Aantal.artsen * 200, weight = 1, color = "#777777", fillColor = ~pal(Aantal.artsen),                    fillOpacity = 0.7, popup = ~paste(Praktijk,"<br/>",Straat,Nummer,"<br/>",Postcode,Plaatsnaam))%>%
-        addCircleMarkers( radius = ~log(individualCount+1)*10 , weight = 1, layerId=~id, lng = ~decimalLongitude, lat = ~decimalLatitude, color = "#777777", fillColor = ~pal(individualCount),  fillOpacity = 0.7, popup = ~paste(verbatimLocality, municipality, stateProvince,"<br/>", "aantal", vernacularName, individualCount,"<br/>", "datum", eventDate, "<br/>", "waarnemer(s)",  identifiedBy ,"<br/>",samplingProtocol,"<br/>",samplingEffort), clusterOptions = markerClusterOptions(freezeAtZoom = 16) ) 
-       #addCircleMarkers(radius = ~individualCount * 2, weight = 1, layerId=~id, lng = ~decimalLongitude, lat = ~decimalLatitude, color = "#777777", fillColor = ~pal(individualCount),   fillOpacity = 0.7, popup = ~paste(verbatimLocality, municipality, stateProvince,"<br/>", "aantal", vernacularName, individualCount,"<br/>", "datum", eventDate, "<br/>", "waarnemer(s)",  identifiedBy ,"<br/>",samplingProtocol,"<br/>",samplingEffort))
+        addCircleMarkers( radius = ~log(individualCount+1)*10 , weight = 1, layerId=~id, lng = ~decimalLongitude, lat = ~decimalLatitude, color = "#777777", fillColor = ~pal(individualCount),                            fillOpacity = 0.7, popup = ~paste(verbatimLocality, municipality, stateProvince,"<br/>", "aantal", vernacularName, individualCount,"<br/>", "datum", eventDate, "<br/>", "waarnemer(s)",  identifiedBy ,"<br/>",samplingProtocol,"<br/>",samplingEffort), clusterOptions = markerClusterOptions(freezeAtZoom = 16) ) 
+        #addWebGLHeatmap(lng = ~decimalLongitude, lat = ~decimalLatitude, intensity = ~log(individualCount+1)/100,size = 10000 )  
+   
+     
+      #addCircleMarkers(radius = ~individualCount * 2, weight = 1, layerId=~id, lng = ~decimalLongitude, lat = ~decimalLatitude, color = "#777777", fillColor = ~pal(individualCount),   fillOpacity = 0.7, popup = ~paste(verbatimLocality, municipality, stateProvince,"<br/>", "aantal", vernacularName, individualCount,"<br/>", "datum", eventDate, "<br/>", "waarnemer(s)",  identifiedBy ,"<br/>",samplingProtocol,"<br/>",samplingEffort))
      # addCircles(lng = ~decimalLongitude, lat = ~decimalLatitude,  layerId=~id, radius = ~individualCount * 3 ,  color = ~pal(individualCount), fillColor = ~pal(individualCount),   fillOpacity = 0.7, popup = ~paste(verbatimLocality, municipality, stateProvince,"<br/>", "aantal", vernacularName, individualCount,"<br/>", "datum", eventDate, "<br/>", "waarnemer(s)",  identifiedBy ,"<br/>",samplingProtocol,"<br/>",samplingEffort))
       
       })
@@ -112,35 +115,35 @@ server <- function(input, output, session) {
   
   observeEvent(input$map_geojson_click, {
     v$msg <- paste("Clicked on", input$map_geojson_click)
+    saveRDS(input$map_geojson_click, file = "data/geojson-msg.rds")
   })
 
   output$message <- renderText(v$msg)
   
-  
+  output$plot2=renderPlot({
+    my_waarnemingen <- subset(waarnemingen, waarnemingen$id == data_of_click$clickedMarker$id )
+    my_lat <- head(my_waarnemingen$decimalLatitude,1)
+    my_lon <- head(my_waarnemingen$decimalLongitude,1)
+    my_filteredwaarnemingen <- waarnemingen[as.Date(waarnemingen$eventDate) >= as.Date(input$tijdstip[1]) & as.Date(waarnemingen$eventDate) <= as.Date(input$tijdstip[2]) & waarnemingen$decimalLongitude==my_lon & waarnemingen$decimalLatitude==my_lat & waarnemingen$vernacularName== input$soort,]
+    waarnemingen <- cbind(my_filteredwaarnemingen$eventDate,waarnemingen$individualCount)
+    plot(waarnemingen[,1],log(waarnemingen[,2]+1))
+    lines(lowess(waarnemingen[,1],log(waarnemingen[,2]+1),f=0.3))
+    
+  })
   # Make a barplot or scatterplot depending of the selected point
   output$plot=renderPlotly({
   #output$plot=renderPlot({
     my_waarnemingen <- subset(waarnemingen, waarnemingen$id == data_of_click$clickedMarker$id )
     my_lat <- head(my_waarnemingen$decimalLatitude,1)
     my_lon <- head(my_waarnemingen$decimalLongitude,1)
-
-   
-    
     my_filteredwaarnemingen <- waarnemingen[as.Date(waarnemingen$eventDate) >= as.Date(input$tijdstip[1]) & as.Date(waarnemingen$eventDate) <= as.Date(input$tijdstip[2]) & waarnemingen$decimalLongitude==my_lon & waarnemingen$decimalLatitude==my_lat & waarnemingen$vernacularName== input$soort,]
     my_location <- my_filteredwaarnemingen$verbatimLocality[1]
-    # aantal_vogels <- my_filteredwaarnemingen$individualCount
-    # datums <- strptime(as.character(as.Date(my_filteredwaarnemingen$eventDate)),"%y/%m/%d")
-    # tellingen <- data.frame(date=datums,aantal_vogels)
-    # daterange=c(as.POSIXlt(min(tellingen$date)),as.POSIXlt(max(tellingen$date)))
-    
 
-    #ggplot(data = my_filteredwaarnemingen, aes(x = eventDate, y = individualCount)) +      geom_bar(stat="identity") + geom_smooth(method = "lm")
- 
-    # plot(tellingen,aantal_vogels,xaxt="n",ylab="KWH/day")          #don't plot the x axis
-    # axis.POSIXct(1, at=seq(daterange[1], daterange[2], by="month"), format="%b") #label the x axis by months
+
    plot_ly(my_filteredwaarnemingen, x = ~eventDate) %>%    
      #axis.POSIXct(1, at=seq(daterange[1], daterange[2], by="month"), format="%b") %>%  
-     add_markers(y = ~individualCount)  %>%
+     add_markers(y = ~log(individualCount + 1))  %>%
+  
 
      layout(title = paste(my_location, "\n" , input$tijdstip[1], "-", input$tijdstip[2]),
              paper_bgcolor='rgb(255,255,255)', plot_bgcolor='rgb(229,229,229)',
@@ -160,6 +163,7 @@ server <- function(input, output, session) {
                           tickcolor = 'rgb(127,127,127)',
                           ticks = 'outside',
                           zeroline = FALSE))
+ # lines(lowess(xy[,1],xy[,2]))
    
     #plot_ly(my_filteredwaarnemingen, x = ~eventDate, y = ~individualCount, mode = "markers")# %>%     add_trace(data = my_filteredwaarnemingen, x = ~eventDate, y = fitted(fit), mode = "lines")
  
