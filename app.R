@@ -5,85 +5,130 @@ library(ggplot2)
 library(plotly)
 library(leaflet.extras)
 
-
-
+#
 # zie https://rstudio.github.io/leaflet/shiny.html
 # klikken op een bol en dan plot: http://www.r-graph-gallery.com/2017/03/14/4-tricks-for-working-with-r-leaflet-and-shiny/
-waarnemingen <- readRDS("data/V3/occurrence.rds")
+#
 
-waarnemingen <-waarnemingen[waarnemingen$municipality == "Kalmthout" | waarnemingen$municipality == "Brecht" | waarnemingen$municipality == "Schoten",]
-#waarnemingen <-waarnemingen[waarnemingen$verbatimLocality == "De Moerkens KALMTHOUT" | waarnemingen$verbatimLocality == "Stappersven KALMTHOUT" | waarnemingen$verbatimLocality == "Drielingenven KALMTHOUT"  | waarnemingen$verbatimLocality == "Biezenkuilen KALMTHOUT" ,]
+
+waarnemingen <- readRDS("data/V3/occurrence.rds")
+waarnemingen <-
+  waarnemingen[waarnemingen$municipality == "Kalmthout" |
+                 waarnemingen$municipality == "Brecht" |
+                 waarnemingen$municipality == "Schoten",]
+# waarnemingen <-
+#   waarnemingen[waarnemingen$verbatimLocality == "De Moerkens KALMTHOUT" |
+#                  waarnemingen$verbatimLocality == "Stappersven KALMTHOUT" |
+#                  waarnemingen$verbatimLocality == "Drielingenven KALMTHOUT"  |
+#                  waarnemingen$verbatimLocality == "Biezenkuilen KALMTHOUT" , ]
+
+date_split <-
+  colsplit(waarnemingen$eventDate,
+           split = "-",
+           names = c('jaar', 'maand', 'tmp'))
+day_split <-
+  colsplit(date_split$tmp,
+           split = "T",
+           names = c('dag', 'tijd'))
+jaar <- as.character(date_split$jaar)
+maand <- as.character(date_split$maand)
+dag <- as.character(day_split$dag)
+tijd <- as.character(day_split$tijd)
+waarnemingen <- cbind(waarnemingen, jaar, maand, dag, tijd)
+
+
 
 # we sorteren hier Descending, zodat de kleinste bollen bovenaan liggen
-waarnemingen <-waarnemingen[order(-waarnemingen$individualCount),]
+waarnemingen <- waarnemingen[order(-waarnemingen$individualCount),]
 
-waarnemers <- read.csv(file = "data/waarnemers_kalmthout.csv", header = TRUE)
+waarnemers <-
+  read.csv(file = "data/waarnemers_kalmthout.csv", header = TRUE)
 
 ui <- bootstrapPage(
-
   tags$style(type = "text/css", "html, body {width:100%;height:100%}"),
-  leafletOutput("map", width = "100%", height = "100%"),
-  absolutePanel(top = 10, right = 10,
-       
-               sliderInput("tijdstip", "tijdstip", min(as.Date(waarnemingen$eventDate)), max(as.Date(waarnemingen$eventDate)), value = range(as.Date(waarnemingen$eventDate))
-                ),
 
-               
-              # plotOutput("plot", height="300px"),
-               plotlyOutput("plot"),
-              #plotOutput("plot2"),
-              selectInput("soort", "Kies de soort", choices=sort(unique(waarnemingen$vernacularName) )),
-              #selectInput("waarnemer", "kies de waarnemer", choices=sort(unique(waarnemingen$identifiedBy) )),
-              selectInput("waarnemer", "kies de waarnemer", choices=waarnemers ),
-              #selectInput("colors", "Kleurenschema",  rownames(subset(brewer.pal.info, category %in% c("seq", "div")))  ),
-                checkboxInput("legend", "Show legend", TRUE),
-              textOutput("message", container = h3)
-               
+ 
+  leafletOutput("map", width = "100%", height = "100%"),
+  absolutePanel(
+    top = 10,
+    right = 10,
+    
+    sliderInput(
+      "tijdstip",
+      "tijdstip",
+      min(as.Date(waarnemingen$eventDate)),
+      max(as.Date(waarnemingen$eventDate)),
+      value = range(as.Date(waarnemingen$eventDate))
+    ),
+    
+    
+    # plotOutput("plot", height="300px"),
+    #plotlyOutput("plot"),
+    plotOutput("plot2"),
+    selectInput("soort", "Kies de soort", choices = sort(unique(
+      waarnemingen$vernacularName
+    ))),
+    
+    #selectInput("waarnemer", "kies de waarnemer", choices=sort(unique(waarnemingen$identifiedBy) )),
+    selectInput("waarnemer", "kies de waarnemer", choices =
+                  waarnemers),
+    #selectInput("colors", "Kleurenschema",  rownames(subset(brewer.pal.info, category %in% c("seq", "div")))  ),
+    checkboxInput("legend", "Show legend", TRUE),
+    textOutput("message", container = h3)
+    
   )
 )
 
 server <- function(input, output, session) {
-  
-  
   v <- reactiveValues(msg = "")
   
-  data_of_click <- reactiveValues(clickedMarker=NULL)
+  data_of_click <- reactiveValues(clickedMarker = NULL)
   
   # Reactive expression for the data subsetted to what the user selected
-
+  
   filteredwaarnemingen <- reactive({
     if (input$waarnemer == "Alle waarnemers") {
-      waarnemingen[as.Date(waarnemingen$eventDate) >= as.Date(input$tijdstip[1]) & as.Date(waarnemingen$eventDate) <= as.Date(input$tijdstip[2]) & waarnemingen$vernacularName== input$soort,]
+      waarnemingen[as.Date(waarnemingen$eventDate) >= as.Date(input$tijdstip[1]) &
+                     as.Date(waarnemingen$eventDate) <= as.Date(input$tijdstip[2]) &
+                     waarnemingen$vernacularName == input$soort,]
     } else {
-      waarnemingen[as.Date(waarnemingen$eventDate) >= as.Date(input$tijdstip[1]) & as.Date(waarnemingen$eventDate) <= as.Date(input$tijdstip[2]) & waarnemingen$vernacularName== input$soort & grepl(input$waarnemer,waarnemingen$identifiedBy),]
+      waarnemingen[as.Date(waarnemingen$eventDate) >= as.Date(input$tijdstip[1]) &
+                     as.Date(waarnemingen$eventDate) <= as.Date(input$tijdstip[2]) &
+                     waarnemingen$vernacularName == input$soort &
+                     grepl(input$waarnemer, waarnemingen$identifiedBy),]
     }
-
-   
+    
+    
     #waarnemingen[waarnemingen$vernacularName== input$soort,]
   })
   # This reactive expression represents the palette function,
   # which changes as the user makes selections in UI.
   colorpal <- reactive({
-   # colorNumeric(input$colors, adreslocaties$Aantal.artsen)
+    # colorNumeric(input$colors, adreslocaties$Aantal.artsen)
     #colorNumeric(input$colors, waarnemingen[waarnemingen$vernacularName== input$soort,]$individualCount)
-    colorNumeric("YlGnBu", waarnemingen[waarnemingen$vernacularName== input$soort,]$individualCount)
+    colorNumeric("YlGnBu", waarnemingen[waarnemingen$vernacularName == input$soort,]$individualCount)
   })
   
   output$map <- renderLeaflet({
     # Use leaflet() here, and only include aspects of the map that
     # won't need to change dynamically (at least, not unless the
     # entire map is being torn down and recreated).
-    topoData <- readLines("data/V3/localities.geojson") 
-
-    leaflet() %>% 
-      addTiles(attribution = 'Data <a href="http://dataset.inbo.be/watervogels-occurrences">http://dataset.inbo.be/watervogels-occurrences</a>'  ) %>% 
+    topoData <- readLines("data/V3/localities.geojson")
+    
+    leaflet() %>%
+      addTiles(attribution = 'Data <a href="http://dataset.inbo.be/watervogels-occurrences">http://dataset.inbo.be/watervogels-occurrences</a>') %>%
       #addProviderTiles(providers$Stamen.TonerLite ) %>%
       
-      addGeoJSON(topoData, weight = 1, color = "#444444", fill = TRUE) %>%
+      addGeoJSON(topoData,
+                 weight = 1,
+                 color = "#444444",
+                 fill = TRUE) %>%
       
       #addTiles(        urlTemplate = "//{s}.tiles.mapbox.com/v3/jcheng.map-5ebohr46/{z}/{x}/{y}.png",        attribution = 'Maps by <a href="http://www.mapbox.com/">Mapbox</a>'      ) %>%
-     setView(lng = 4.5809, lat = 51.3535, zoom = 12)
-
+      setView(lng = 4.5809,
+              lat = 51.3535,
+              zoom = 12)
+    
   })
   
   # Incremental changes to the map (in this case, replacing the
@@ -92,24 +137,49 @@ server <- function(input, output, session) {
   # should be managed in its own observer.
   observe({
     pal <- colorpal()
-      leafletProxy("map", data = filteredwaarnemingen()) %>%
+    leafletProxy("map", data = filteredwaarnemingen()) %>%
       clearShapes() %>%
-        clearMarkerClusters() %>%
-        clearMarkers() %>%
-       
-        #addCircles(radius = ~Aantal.artsen * 200, weight = 1, color = "#777777", fillColor = ~pal(Aantal.artsen),                    fillOpacity = 0.7, popup = ~paste(Praktijk,"<br/>",Straat,Nummer,"<br/>",Postcode,Plaatsnaam))%>%
-        addCircleMarkers( radius = ~log(individualCount+1)*10 , weight = 1, layerId=~id, lng = ~decimalLongitude, lat = ~decimalLatitude, color = "#777777", fillColor = ~pal(individualCount),                            fillOpacity = 0.7, popup = ~paste(verbatimLocality, municipality, stateProvince,"<br/>", "aantal", vernacularName, individualCount,"<br/>", "datum", eventDate, "<br/>", "waarnemer(s)",  identifiedBy ,"<br/>",samplingProtocol,"<br/>",samplingEffort), clusterOptions = markerClusterOptions(freezeAtZoom = 16) ) 
-        #addWebGLHeatmap(lng = ~decimalLongitude, lat = ~decimalLatitude, intensity = ~log(individualCount+1)/100,size = 10000 )  
-   
-     
-      #addCircleMarkers(radius = ~individualCount * 2, weight = 1, layerId=~id, lng = ~decimalLongitude, lat = ~decimalLatitude, color = "#777777", fillColor = ~pal(individualCount),   fillOpacity = 0.7, popup = ~paste(verbatimLocality, municipality, stateProvince,"<br/>", "aantal", vernacularName, individualCount,"<br/>", "datum", eventDate, "<br/>", "waarnemer(s)",  identifiedBy ,"<br/>",samplingProtocol,"<br/>",samplingEffort))
-     # addCircles(lng = ~decimalLongitude, lat = ~decimalLatitude,  layerId=~id, radius = ~individualCount * 3 ,  color = ~pal(individualCount), fillColor = ~pal(individualCount),   fillOpacity = 0.7, popup = ~paste(verbatimLocality, municipality, stateProvince,"<br/>", "aantal", vernacularName, individualCount,"<br/>", "datum", eventDate, "<br/>", "waarnemer(s)",  identifiedBy ,"<br/>",samplingProtocol,"<br/>",samplingEffort))
+      clearMarkerClusters() %>%
+      clearMarkers() %>%
       
-      })
+      #addCircles(radius = ~Aantal.artsen * 200, weight = 1, color = "#777777", fillColor = ~pal(Aantal.artsen),                    fillOpacity = 0.7, popup = ~paste(Praktijk,"<br/>",Straat,Nummer,"<br/>",Postcode,Plaatsnaam))%>%
+      addCircleMarkers(
+        radius = ~ log(individualCount + 1) * 10 ,
+        weight = 1,
+        layerId =  ~ id,
+        lng = ~ decimalLongitude,
+        lat = ~ decimalLatitude,
+        color = "#777777",
+        fillColor = ~ pal(individualCount),
+        fillOpacity = 0.7,
+        popup = ~ paste(
+          verbatimLocality,
+          municipality,
+          stateProvince,
+          "<br/>",
+          "aantal",
+          vernacularName,
+          individualCount,
+          "<br/>",
+          "datum",
+          eventDate,
+          "<br/>",
+          "waarnemer(s)",
+          identifiedBy ,
+          "<br/>",
+          samplingProtocol,
+          "<br/>",
+          samplingEffort
+        ),
+        clusterOptions = markerClusterOptions()
+      )
+    #addWebGLHeatmap(lng = ~decimalLongitude, lat = ~decimalLatitude, intensity = ~log(individualCount+1)/100,size = 10000 )
+    
+  })
   
   ################## Plot on click
   # store the click
-  observeEvent(input$map_marker_click,{
+  observeEvent(input$map_marker_click, {
     data_of_click$clickedMarker <- input$map_marker_click
   })
   
@@ -117,80 +187,119 @@ server <- function(input, output, session) {
     v$msg <- paste("Clicked on", input$map_geojson_click)
     saveRDS(input$map_geojson_click, file = "data/geojson-msg.rds")
   })
-
+  
   output$message <- renderText(v$msg)
   
-  output$plot2=renderPlot({
-    my_waarnemingen <- subset(waarnemingen, waarnemingen$id == data_of_click$clickedMarker$id )
-    my_lat <- head(my_waarnemingen$decimalLatitude,1)
-    my_lon <- head(my_waarnemingen$decimalLongitude,1)
-    my_filteredwaarnemingen <- waarnemingen[as.Date(waarnemingen$eventDate) >= as.Date(input$tijdstip[1]) & as.Date(waarnemingen$eventDate) <= as.Date(input$tijdstip[2]) & waarnemingen$decimalLongitude==my_lon & waarnemingen$decimalLatitude==my_lat & waarnemingen$vernacularName== input$soort,]
-    waarnemingen <- cbind(my_filteredwaarnemingen$eventDate,waarnemingen$individualCount)
-    plot(waarnemingen[,1],log(waarnemingen[,2]+1))
-    lines(lowess(waarnemingen[,1],log(waarnemingen[,2]+1),f=0.3))
+  # output$plot2=renderPlot({
+  #   my_waarnemingen <- subset(waarnemingen, waarnemingen$id == data_of_click$clickedMarker$id )
+  #   my_lat <- head(my_waarnemingen$decimalLatitude,1)
+  #   my_lon <- head(my_waarnemingen$decimalLongitude,1)
+  #   my_filteredwaarnemingen <- waarnemingen[as.Date(waarnemingen$eventDate) >= as.Date(input$tijdstip[1]) & as.Date(waarnemingen$eventDate) <= as.Date(input$tijdstip[2]) & waarnemingen$decimalLongitude==my_lon & waarnemingen$decimalLatitude==my_lat & waarnemingen$vernacularName== input$soort,]
+  #   waarnemingen <- cbind(my_filteredwaarnemingen$eventDate,waarnemingen$individualCount)
+  #   plot(waarnemingen[,1],log(waarnemingen[,2]+1))
+  #   lines(lowess(waarnemingen[,1],log(waarnemingen[,2]+1),f=0.3))
+  #
+  # })
+  
+  output$plot2 <- renderPlot({
+    my_waarnemingen <-
+      subset(waarnemingen,
+             waarnemingen$id == data_of_click$clickedMarker$id)
+    my_lat <- head(my_waarnemingen$decimalLatitude, 1)
+    my_lon <- head(my_waarnemingen$decimalLongitude, 1)
+    my_filteredwaarnemingen <-
+      waarnemingen[as.Date(waarnemingen$eventDate) >= as.Date(input$tijdstip[1]) &
+                     as.Date(waarnemingen$eventDate) <= as.Date(input$tijdstip[2]) &
+                     waarnemingen$decimalLongitude == my_lon &
+                     waarnemingen$decimalLatitude == my_lat &
+                     waarnemingen$vernacularName == input$soort,]
+    my_location <-
+      paste(
+        my_filteredwaarnemingen$verbatimLocality[1],
+        my_filteredwaarnemingen$municipality[1]
+      )
+    
+    #http://r-statistics.co/Top50-Ggplot2-Visualizations-MasterList-R-Code.html
+    # By default, geom_bar() has the stat set to count.
+    # That means, when you provide just a continuous X variable (and no Y variable), it tries to make a histogram out of the data.
+    # In order to make a bar chart create bars instead of histogram, you need to do two things.
+    #     1. Set stat=identity
+    #     2. Provide both x and y inside aes() where, x is either character or factor and y is numeric.
+    p <-
+      ggplot(data = my_filteredwaarnemingen, aes(x = jaar, y = individualCount)) + theme(axis.text.x = element_text(angle = 60, hjust = 1))
+    
+    # add geom
+    p <- p + geom_bar(stat = 'identity', width = .5)
+    
+    # update data layer with new mapping
+    p <- p %+% aes(fill = maand)
+    
+    # titel en subtitel
+    p <-
+      p %+% labs(subtitle = my_location,  title = input$soort)
+    
+    p
     
   })
+  
   # Make a barplot or scatterplot depending of the selected point
-  output$plot=renderPlotly({
-  #output$plot=renderPlot({
-    my_waarnemingen <- subset(waarnemingen, waarnemingen$id == data_of_click$clickedMarker$id )
-    my_lat <- head(my_waarnemingen$decimalLatitude,1)
-    my_lon <- head(my_waarnemingen$decimalLongitude,1)
-    my_filteredwaarnemingen <- waarnemingen[as.Date(waarnemingen$eventDate) >= as.Date(input$tijdstip[1]) & as.Date(waarnemingen$eventDate) <= as.Date(input$tijdstip[2]) & waarnemingen$decimalLongitude==my_lon & waarnemingen$decimalLatitude==my_lat & waarnemingen$vernacularName== input$soort,]
+  output$plot = renderPlotly({
+    my_waarnemingen <-
+      subset(waarnemingen,
+             waarnemingen$id == data_of_click$clickedMarker$id)
+    my_lat <- head(my_waarnemingen$decimalLatitude, 1)
+    my_lon <- head(my_waarnemingen$decimalLongitude, 1)
+    my_filteredwaarnemingen <-
+      waarnemingen[as.Date(waarnemingen$eventDate) >= as.Date(input$tijdstip[1]) &
+                     as.Date(waarnemingen$eventDate) <= as.Date(input$tijdstip[2]) &
+                     waarnemingen$decimalLongitude == my_lon &
+                     waarnemingen$decimalLatitude == my_lat &
+                     waarnemingen$vernacularName == input$soort,]
     my_location <- my_filteredwaarnemingen$verbatimLocality[1]
-
-
-   plot_ly(my_filteredwaarnemingen, x = ~eventDate) %>%    
-     #axis.POSIXct(1, at=seq(daterange[1], daterange[2], by="month"), format="%b") %>%  
-     add_markers(y = ~log(individualCount + 1))  %>%
-  
-
-     layout(title = paste(my_location, "\n" , input$tijdstip[1], "-", input$tijdstip[2]),
-             paper_bgcolor='rgb(255,255,255)', plot_bgcolor='rgb(229,229,229)',
-             xaxis = list(title = "Datum",
-                          gridcolor = 'rgb(255,255,255)',
-                          showgrid = TRUE,
-                          showline = FALSE,
-                          showticklabels = TRUE,
-                          tickcolor = 'rgb(127,127,127)',
-                          ticks = 'outside',
-                          zeroline = FALSE),
-             yaxis = list(title = paste("Aantal ",input$soort),
-                          gridcolor = 'rgb(255,255,255)',
-                          showgrid = TRUE,
-                          showline = FALSE,
-                          showticklabels = TRUE,
-                          tickcolor = 'rgb(127,127,127)',
-                          ticks = 'outside',
-                          zeroline = FALSE))
- # lines(lowess(xy[,1],xy[,2]))
-   
-    #plot_ly(my_filteredwaarnemingen, x = ~eventDate, y = ~individualCount, mode = "markers")# %>%     add_trace(data = my_filteredwaarnemingen, x = ~eventDate, y = fitted(fit), mode = "lines")
- 
-
-
- 
-    #ggplot(data=waarnemingen, aes(x=eventDate, y=individualCount, group=vernacularName, fill=vernacularName, color=vernacularName)) + stat_summary(fun.y = sum, na.rm=TRUE, geom='line')   
+    
+    
+    plot_ly(my_filteredwaarnemingen, x = ~ eventDate) %>%
+      add_markers(y = ~ log(individualCount + 1))  %>%
+      layout(
+        title = paste(my_location, "\n" , input$tijdstip[1], "-", input$tijdstip[2]),
+        paper_bgcolor = 'rgb(255,255,255)',
+        plot_bgcolor = 'rgb(229,229,229)',
+        xaxis = list(
+          title = "Datum",
+          gridcolor = 'rgb(255,255,255)',
+          showgrid = TRUE,
+          showline = FALSE,
+          showticklabels = TRUE,
+          tickcolor = 'rgb(127,127,127)',
+          ticks = 'outside',
+          zeroline = FALSE
+        ),
+        yaxis = list(
+          title = paste("Aantal ", input$soort),
+          gridcolor = 'rgb(255,255,255)',
+          showgrid = TRUE,
+          showline = FALSE,
+          showticklabels = TRUE,
+          tickcolor = 'rgb(127,127,127)',
+          ticks = 'outside',
+          zeroline = FALSE
+        )
+      )
   })
-
-  
-  
-
   
   # Use a separate observer to recreate the legend as needed.
   observe({
-
     proxy <- leafletProxy("map", data = waarnemingen)
-    
     # Remove any existing legend, and only if the legend is
     # enabled, create a new one.
     proxy %>% clearControls()
     if (input$legend) {
       pal <- colorpal()
-      proxy %>% addLegend(position = "bottomright",
-                          pal = pal, values = waarnemingen[waarnemingen$vernacularName== input$soort,]$individualCount
-                         # pal = pal, values = ~individualCount
-      ) 
+      proxy %>% addLegend(
+        position = "bottomright",
+        pal = pal,
+        values = waarnemingen[waarnemingen$vernacularName == input$soort,]$individualCount
+      )
     }
   })
 }
