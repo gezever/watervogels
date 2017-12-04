@@ -2,22 +2,22 @@ library(shiny)
 library(leaflet)
 library(RColorBrewer)
 library(ggplot2)
-library(plotly)
 library(leaflet.extras)
+library(sp)
+require(reshape)
 
 #
 # zie https://rstudio.github.io/leaflet/shiny.html
 # klikken op een bol en dan plot: http://www.r-graph-gallery.com/2017/03/14/4-tricks-for-working-with-r-leaflet-and-shiny/
 #
 
-
+topoData <- readLines("data/V3/localities.geojson")
+topoData.df <- as.data.frame(fromJSON(topoData))
 waarnemingen <- readRDS("data/V3/occurrence.rds")
-waarnemingen <-
-  waarnemingen[waarnemingen$municipality == "Kalmthout" |
+waarnemingen <-  waarnemingen[waarnemingen$municipality == "Kalmthout" |
                  waarnemingen$municipality == "Brecht" |
                  waarnemingen$municipality == "Schoten",]
-# waarnemingen <-
-#   waarnemingen[waarnemingen$verbatimLocality == "De Moerkens KALMTHOUT" |
+# waarnemingen <-  waarnemingen[waarnemingen$verbatimLocality == "De Moerkens KALMTHOUT" |
 #                  waarnemingen$verbatimLocality == "Stappersven KALMTHOUT" |
 #                  waarnemingen$verbatimLocality == "Drielingenven KALMTHOUT"  |
 #                  waarnemingen$verbatimLocality == "Biezenkuilen KALMTHOUT" , ]
@@ -44,15 +44,14 @@ waarnemingen <- waarnemingen[order(-waarnemingen$individualCount),]
 waarnemers <-
   read.csv(file = "data/waarnemers_kalmthout.csv", header = TRUE)
 
+
+
 ui <- bootstrapPage(
   tags$style(type = "text/css", "html, body {width:100%;height:100%}"),
-
- 
   leafletOutput("map", width = "100%", height = "100%"),
   absolutePanel(
     top = 10,
     right = 10,
-    
     sliderInput(
       "tijdstip",
       "tijdstip",
@@ -60,27 +59,19 @@ ui <- bootstrapPage(
       max(as.Date(waarnemingen$eventDate)),
       value = range(as.Date(waarnemingen$eventDate))
     ),
-    
-    
-    # plotOutput("plot", height="300px"),
-    #plotlyOutput("plot"),
     plotOutput("plot2"),
     selectInput("soort", "Kies de soort", choices = sort(unique(
       waarnemingen$vernacularName
     ))),
-    
-    #selectInput("waarnemer", "kies de waarnemer", choices=sort(unique(waarnemingen$identifiedBy) )),
     selectInput("waarnemer", "kies de waarnemer", choices =
                   waarnemers),
-    #selectInput("colors", "Kleurenschema",  rownames(subset(brewer.pal.info, category %in% c("seq", "div")))  ),
     checkboxInput("legend", "Show legend", TRUE),
     textOutput("message", container = h3)
-    
   )
 )
 
 server <- function(input, output, session) {
-  v <- reactiveValues(msg = "")
+  data_of_click_on_geojson <- reactiveValues(msg = NULL)
   
   data_of_click <- reactiveValues(clickedMarker = NULL)
   
@@ -104,8 +95,6 @@ server <- function(input, output, session) {
   # This reactive expression represents the palette function,
   # which changes as the user makes selections in UI.
   colorpal <- reactive({
-    # colorNumeric(input$colors, adreslocaties$Aantal.artsen)
-    #colorNumeric(input$colors, waarnemingen[waarnemingen$vernacularName== input$soort,]$individualCount)
     colorNumeric("YlGnBu", waarnemingen[waarnemingen$vernacularName == input$soort,]$individualCount)
   })
   
@@ -113,12 +102,9 @@ server <- function(input, output, session) {
     # Use leaflet() here, and only include aspects of the map that
     # won't need to change dynamically (at least, not unless the
     # entire map is being torn down and recreated).
-    topoData <- readLines("data/V3/localities.geojson")
     
     leaflet() %>%
       addTiles(attribution = 'Data <a href="http://dataset.inbo.be/watervogels-occurrences">http://dataset.inbo.be/watervogels-occurrences</a>') %>%
-      #addProviderTiles(providers$Stamen.TonerLite ) %>%
-      
       addGeoJSON(topoData,
                  weight = 1,
                  color = "#444444",
@@ -128,7 +114,6 @@ server <- function(input, output, session) {
       setView(lng = 4.5809,
               lat = 51.3535,
               zoom = 12)
-    
   })
   
   # Incremental changes to the map (in this case, replacing the
@@ -141,8 +126,6 @@ server <- function(input, output, session) {
       clearShapes() %>%
       clearMarkerClusters() %>%
       clearMarkers() %>%
-      
-      #addCircles(radius = ~Aantal.artsen * 200, weight = 1, color = "#777777", fillColor = ~pal(Aantal.artsen),                    fillOpacity = 0.7, popup = ~paste(Praktijk,"<br/>",Straat,Nummer,"<br/>",Postcode,Plaatsnaam))%>%
       addCircleMarkers(
         radius = ~ log(individualCount + 1) * 10 ,
         weight = 1,
@@ -184,23 +167,12 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$map_geojson_click, {
-    v$msg <- paste("Clicked on", input$map_geojson_click)
-    saveRDS(input$map_geojson_click, file = "data/geojson-msg.rds")
+    polygon_matrix <- matrix(unlist(topodata_selected_object$features.geometry$coordinates),ncol = 2)
+    waarnemingen_in_geojson_object <- subset(waarnemingen, sp::point.in.polygon(c(waarnemingen$decimalLatitude),c(waarnemingen$decimalLongitude), polygon_matrix[,2], polygon_matrix[,1]) == 1 )
+    data_of_click_on_geojson$msg <- waarnemingen_in_geojson_object$decimalLongitude[1]
   })
   
-  output$message <- renderText(v$msg)
-  
-  # output$plot2=renderPlot({
-  #   my_waarnemingen <- subset(waarnemingen, waarnemingen$id == data_of_click$clickedMarker$id )
-  #   my_lat <- head(my_waarnemingen$decimalLatitude,1)
-  #   my_lon <- head(my_waarnemingen$decimalLongitude,1)
-  #   my_filteredwaarnemingen <- waarnemingen[as.Date(waarnemingen$eventDate) >= as.Date(input$tijdstip[1]) & as.Date(waarnemingen$eventDate) <= as.Date(input$tijdstip[2]) & waarnemingen$decimalLongitude==my_lon & waarnemingen$decimalLatitude==my_lat & waarnemingen$vernacularName== input$soort,]
-  #   waarnemingen <- cbind(my_filteredwaarnemingen$eventDate,waarnemingen$individualCount)
-  #   plot(waarnemingen[,1],log(waarnemingen[,2]+1))
-  #   lines(lowess(waarnemingen[,1],log(waarnemingen[,2]+1),f=0.3))
-  #
-  # })
-  
+  output$message <- renderText(data_of_click_on_geojson$msg)
   output$plot2 <- renderPlot({
     my_waarnemingen <-
       subset(waarnemingen,
@@ -225,8 +197,7 @@ server <- function(input, output, session) {
     # In order to make a bar chart create bars instead of histogram, you need to do two things.
     #     1. Set stat=identity
     #     2. Provide both x and y inside aes() where, x is either character or factor and y is numeric.
-    p <-
-      ggplot(data = my_filteredwaarnemingen, aes(x = jaar, y = individualCount)) + theme(axis.text.x = element_text(angle = 60, hjust = 1))
+    p <- ggplot(data = my_filteredwaarnemingen, aes(x = jaar, y = individualCount)) + theme(axis.text.x = element_text(angle = 60, hjust = 1))
     
     # add geom
     p <- p + geom_bar(stat = 'identity', width = .5)
@@ -235,12 +206,11 @@ server <- function(input, output, session) {
     p <- p %+% aes(fill = maand)
     
     # titel en subtitel
-    p <-
-      p %+% labs(subtitle = my_location,  title = input$soort)
-    
+    p <-  p %+% labs(subtitle = my_location,  title = input$soort)
     p
     
   })
+  
   
   # Make a barplot or scatterplot depending of the selected point
   output$plot = renderPlotly({
@@ -256,7 +226,6 @@ server <- function(input, output, session) {
                      waarnemingen$decimalLatitude == my_lat &
                      waarnemingen$vernacularName == input$soort,]
     my_location <- my_filteredwaarnemingen$verbatimLocality[1]
-    
     
     plot_ly(my_filteredwaarnemingen, x = ~ eventDate) %>%
       add_markers(y = ~ log(individualCount + 1))  %>%
