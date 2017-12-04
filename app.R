@@ -5,6 +5,7 @@ library(ggplot2)
 library(leaflet.extras)
 library(sp)
 require(reshape)
+library(jsonlite)
 
 #
 # zie https://rstudio.github.io/leaflet/shiny.html
@@ -14,9 +15,9 @@ require(reshape)
 topoData <- readLines("data/V3/localities.geojson")
 topoData.df <- as.data.frame(fromJSON(topoData))
 waarnemingen <- readRDS("data/V3/occurrence.rds")
-waarnemingen <-  waarnemingen[waarnemingen$municipality == "Kalmthout" |
-                 waarnemingen$municipality == "Brecht" |
-                 waarnemingen$municipality == "Schoten",]
+# waarnemingen <-  waarnemingen[waarnemingen$municipality == "Kalmthout" |
+#                  waarnemingen$municipality == "Brecht" |
+#                  waarnemingen$municipality == "Schoten",]
 # waarnemingen <-  waarnemingen[waarnemingen$verbatimLocality == "De Moerkens KALMTHOUT" |
 #                  waarnemingen$verbatimLocality == "Stappersven KALMTHOUT" |
 #                  waarnemingen$verbatimLocality == "Drielingenven KALMTHOUT"  |
@@ -167,6 +168,7 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$map_geojson_click, {
+    topodata_selected_object <- subset(topoData.df, topoData.df$features.properties$code == input$map_geojson_click$properties$code)
     polygon_matrix <- matrix(unlist(topodata_selected_object$features.geometry$coordinates),ncol = 2)
     waarnemingen_in_geojson_object <- subset(waarnemingen, sp::point.in.polygon(c(waarnemingen$decimalLatitude),c(waarnemingen$decimalLongitude), polygon_matrix[,2], polygon_matrix[,1]) == 1 )
     data_of_click_on_geojson$msg <- waarnemingen_in_geojson_object$decimalLongitude[1]
@@ -211,50 +213,7 @@ server <- function(input, output, session) {
     
   })
   
-  
-  # Make a barplot or scatterplot depending of the selected point
-  output$plot = renderPlotly({
-    my_waarnemingen <-
-      subset(waarnemingen,
-             waarnemingen$id == data_of_click$clickedMarker$id)
-    my_lat <- head(my_waarnemingen$decimalLatitude, 1)
-    my_lon <- head(my_waarnemingen$decimalLongitude, 1)
-    my_filteredwaarnemingen <-
-      waarnemingen[as.Date(waarnemingen$eventDate) >= as.Date(input$tijdstip[1]) &
-                     as.Date(waarnemingen$eventDate) <= as.Date(input$tijdstip[2]) &
-                     waarnemingen$decimalLongitude == my_lon &
-                     waarnemingen$decimalLatitude == my_lat &
-                     waarnemingen$vernacularName == input$soort,]
-    my_location <- my_filteredwaarnemingen$verbatimLocality[1]
-    
-    plot_ly(my_filteredwaarnemingen, x = ~ eventDate) %>%
-      add_markers(y = ~ log(individualCount + 1))  %>%
-      layout(
-        title = paste(my_location, "\n" , input$tijdstip[1], "-", input$tijdstip[2]),
-        paper_bgcolor = 'rgb(255,255,255)',
-        plot_bgcolor = 'rgb(229,229,229)',
-        xaxis = list(
-          title = "Datum",
-          gridcolor = 'rgb(255,255,255)',
-          showgrid = TRUE,
-          showline = FALSE,
-          showticklabels = TRUE,
-          tickcolor = 'rgb(127,127,127)',
-          ticks = 'outside',
-          zeroline = FALSE
-        ),
-        yaxis = list(
-          title = paste("Aantal ", input$soort),
-          gridcolor = 'rgb(255,255,255)',
-          showgrid = TRUE,
-          showline = FALSE,
-          showticklabels = TRUE,
-          tickcolor = 'rgb(127,127,127)',
-          ticks = 'outside',
-          zeroline = FALSE
-        )
-      )
-  })
+ 
   
   # Use a separate observer to recreate the legend as needed.
   observe({
