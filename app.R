@@ -41,7 +41,6 @@ ui <- bootstrapPage(
 )
 
 server <- function(input, output, session) {
-  source('functions.R', local = TRUE)
  
   waarnemingen_in <- reactiveValues(clickedGeojson = NULL)
   data_of_click <- reactiveValues(clickedMarker = NULL)

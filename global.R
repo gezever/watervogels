@@ -1,11 +1,11 @@
 
 # topoData <- readLines("data/V3/localities.geojson")
 # topoData.df <- as.data.frame(fromJSON(topoData))
-topoData.df <- as.data.frame(fromJSON("data/V3/localities.geojson"))
-waarnemingen <- readRDS("data/V3/occurrence.rds")
-waarnemingen <-  waarnemingen[waarnemingen$municipality == "Kalmthout" |
-                                waarnemingen$municipality == "Brecht" |
-                                waarnemingen$municipality == "Schoten",]
+# topoData.df <- as.data.frame(fromJSON("data/V3/localities.geojson"))
+# waarnemingen <- readRDS("data/V3/occurrence.rds")
+# waarnemingen <-  waarnemingen[waarnemingen$municipality == "Kalmthout" |
+#                                 waarnemingen$municipality == "Brecht" |
+#                                 waarnemingen$municipality == "Schoten",]
 # waarnemingen <-  waarnemingen[waarnemingen$verbatimLocality == "De Moerkens KALMTHOUT" |
 #                  waarnemingen$verbatimLocality == "Stappersven KALMTHOUT" |
 #                  waarnemingen$verbatimLocality == "Drielingenven KALMTHOUT"  |
