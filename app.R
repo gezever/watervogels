@@ -5,10 +5,43 @@ library(ggplot2)
 library(sp)
 require(reshape)
 library(jsonlite)
-source('global.R', local = TRUE)
+
+#bron: https://github.com/inbo/data-publication/blob/32c32e0f736b114833813951cd099e29377fc0f0/datasets/watervogels-occurrences/localities/localities.geojson
+topoData <- readLines("data/V3/localities.geojson")
+topoData.df <- as.data.frame(fromJSON(topoData))
+waarnemingen <- readRDS("data/V3/occurrence.rds")
+waarnemingen <-  waarnemingen[which( !is.na(waarnemingen$decimalLatitude), arr.ind=TRUE),]
+waarnemingen <-  waarnemingen[which( !is.na(waarnemingen$decimalLongitude), arr.ind=TRUE),]
+waarnemingen <- jitter(waarnemingen)
+#waarnemingen <- head(waarnemingen,10000) 
+# waarnemingen <-  waarnemingen[waarnemingen$municipality == "Kalmthout" |
+#                                 waarnemingen$municipality == "Brecht" |
+#                                 waarnemingen$municipality == "Schoten",]
+# waarnemingen <-  waarnemingen[waarnemingen$verbatimLocality == "De Moerkens KALMTHOUT" |
+#                  waarnemingen$verbatimLocality == "Stappersven KALMTHOUT" |
+#                  waarnemingen$verbatimLocality == "Drielingenven KALMTHOUT"  |
+#                  waarnemingen$verbatimLocality == "Biezenkuilen KALMTHOUT" , ]
+
+date_split <-
+  colsplit(waarnemingen$eventDate,
+           split = "-",
+           names = c('jaar', 'maand', 'tmp'))
+day_split <-
+  colsplit(date_split$tmp,
+           split = "T",
+           names = c('dag', 'tijd'))
+jaar <- as.character(date_split$jaar)
+maand <- as.character(date_split$maand)
+dag <- as.character(day_split$dag)
+tijd <- as.character(day_split$tijd)
+waarnemingen <- cbind(waarnemingen, jaar, maand, dag, tijd)
 
 
 
+# we sorteren hier Descending, zodat de kleinste bollen bovenaan liggen
+waarnemingen <- waarnemingen[order(-waarnemingen$individualCount),]
+
+waarnemers <-  read.csv(file = "data/alle-waarnemers.csv", header = TRUE)
 #
 # zie https://rstudio.github.io/leaflet/shiny.html
 # klikken op een bol en dan plot: http://www.r-graph-gallery.com/2017/03/14/4-tricks-for-working-with-r-leaflet-and-shiny/
@@ -188,7 +221,7 @@ server <- function(input, output, session) {
     proxy %>% clearGeoJSON()
     if (input$natuurgebieden) {
       proxy %>% 
-        addGeoJSON(topoData,  weight = 1,   color = "#008000", fill = TRUE) 
+        addGeoJSON(topoData,  weight = 1,   color = "#cc3300", fill = TRUE) 
     }
   })
   
