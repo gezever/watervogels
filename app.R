@@ -79,7 +79,7 @@ server <- function(input, output, session) {
       #addGeoJSON(topoData,  weight = 1,   color = "#444444", fill = TRUE) %>%
       setView(lng = 4.5809,
               lat = 51.3535,
-              zoom = 12)
+              zoom = 9)
   })
   
   # Incremental changes to the map (in this case, replacing the
@@ -104,7 +104,7 @@ server <- function(input, output, session) {
 
   
   
-  plot_waarnemingen <- function(wnm,locatie){
+  calculate_plot <- function(wnm,locatie){
     
     #http://r-statistics.co/Top50-Ggplot2-Visualizations-MasterList-R-Code.html
     # By default, geom_bar() has the stat set to count.
@@ -129,24 +129,23 @@ server <- function(input, output, session) {
   # store the click
   observeEvent(input$map_marker_click, {
     data_of_click$clickedMarker <- input$map_marker_click
-    #output$message <- renderText(paste(waarnemingen_in$clickedGeojson$decimalLatitude[1],data_of_click$clickedMarker$id))
+   
     output$plot2 <- renderPlot({
-      my_waarnemingen <-  subset(waarnemingen, waarnemingen$id == data_of_click$clickedMarker$id)
-      #my_waarnemingen <-  subset(waarnemingen, waarnemingen$id == data_of_click$clickedMarker$id)
-      my_lat <- head(my_waarnemingen$decimalLatitude, 1)
-      my_lon <- head(my_waarnemingen$decimalLongitude, 1)
-      my_filteredwaarnemingen <-
-        waarnemingen[as.Date(waarnemingen$eventDate) >= as.Date(input$tijdstip[1]) &
-                       as.Date(waarnemingen$eventDate) <= as.Date(input$tijdstip[2]) &
-                       waarnemingen$decimalLongitude == my_lon &
+      clicked_waarneming <-  subset(waarnemingen, waarnemingen$id == data_of_click$clickedMarker$id)
+      my_lat <- clicked_waarneming$decimalLatitude[1]
+      my_lon <- clicked_waarneming$decimalLongitude[1]
+      filteredwaarnemingen <-
+        waarnemingen[waarnemingen$decimalLongitude == my_lon &
                        waarnemingen$decimalLatitude == my_lat &
+                       as.Date(waarnemingen$eventDate) >= as.Date(input$tijdstip[1]) &
+                       as.Date(waarnemingen$eventDate) <= as.Date(input$tijdstip[2]) &
                        waarnemingen$vernacularName == input$soort,]
       
       my_location <-paste(
-        my_filteredwaarnemingen$verbatimLocality[1],
-        my_filteredwaarnemingen$municipality[1]
+        filteredwaarnemingen$verbatimLocality[1],
+        filteredwaarnemingen$municipality[1]
       )
-      p <- plot_waarnemingen(my_filteredwaarnemingen,my_location) 
+      p <- calculate_plot(filteredwaarnemingen,my_location) 
       p
       
     })
@@ -154,33 +153,34 @@ server <- function(input, output, session) {
   observeEvent(input$map_geojson_click, {
     topodata_selected_object <- subset(topoData.df, topoData.df$features.properties$code == input$map_geojson_click$properties$code)
     polygon_matrix <- matrix(unlist(topodata_selected_object$features.geometry$coordinates),ncol = 2)
+    #polygon_matrix <- matrix(topodata_selected_object$features.geometry$coordinates[[1]][[1]][[1]],ncol = 2)
+    #polygon_matrix <- matrix(topodata_selected_object$features.geometry$coordinates,ncol = 2)
     waarnemingen_in$clickedGeojson  <- subset(waarnemingen, sp::point.in.polygon(c(waarnemingen$decimalLatitude),c(waarnemingen$decimalLongitude), polygon_matrix[,2], polygon_matrix[,1]) == 1 )
     output$plot2 <- renderPlot({
-      my_waarnemingen <- waarnemingen_in$clickedGeojson
-      #my_waarnemingen <-  subset(waarnemingen, waarnemingen$id == data_of_click$clickedMarker$id)
-      my_lat <- head(my_waarnemingen$decimalLatitude, 1)
-      my_lon <- head(my_waarnemingen$decimalLongitude, 1)
-      my_filteredwaarnemingen <-
-        waarnemingen[as.Date(waarnemingen$eventDate) >= as.Date(input$tijdstip[1]) &
-                       as.Date(waarnemingen$eventDate) <= as.Date(input$tijdstip[2]) &
-                       waarnemingen$decimalLongitude == my_lon &
+      clicked_waarneming <- waarnemingen_in$clickedGeojson
+      lon <- clicked_waarneming$decimalLongitude
+      lat <- clicked_waarneming$decimalLatitude
+      my_lat <- head(lat, 1)
+      my_lon <- head(lon, 1)
+      filteredwaarnemingen <-
+        waarnemingen[waarnemingen$decimalLongitude == my_lon &
                        waarnemingen$decimalLatitude == my_lat &
+                       as.Date(waarnemingen$eventDate) >= as.Date(input$tijdstip[1]) &
+                       as.Date(waarnemingen$eventDate) <= as.Date(input$tijdstip[2]) &
                        waarnemingen$vernacularName == input$soort,]
       
       my_location <-paste(
-        my_filteredwaarnemingen$verbatimLocality[1],
-        my_filteredwaarnemingen$municipality[1]
+        filteredwaarnemingen$verbatimLocality[1],
+        filteredwaarnemingen$municipality[1]
       )
-      
-      
-      p <- plot_waarnemingen(my_filteredwaarnemingen,my_location) 
+      p <- calculate_plot(filteredwaarnemingen,my_location) 
       p
       
     })
     
   })
  
-
+  output$message <- renderText(paste(input$map_geojson_click$properties$code,waarnemingen_in$clickedGeojson$decimalLatitude[1]))
   # Use a separate observer to add geojson objects.
   observe({
     proxy <- leafletProxy("map", data = waarnemingen)
@@ -189,7 +189,7 @@ server <- function(input, output, session) {
     proxy %>% clearGeoJSON()
     if (input$natuurgebieden) {
       proxy %>% 
-        addGeoJSON(topoData,  weight = 1,   color = "#444444", fill = TRUE) 
+        addGeoJSON(topoData,  weight = 1,   color = "#008000", fill = TRUE) 
     }
   })
   

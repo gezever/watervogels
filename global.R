@@ -1,6 +1,7 @@
 
-topoData <- readLines("data/V3/localities.geojson")
-topoData.df <- as.data.frame(fromJSON(topoData))
+# topoData <- readLines("data/V3/localities.geojson")
+# topoData.df <- as.data.frame(fromJSON(topoData))
+topoData.df <- as.data.frame(fromJSON("data/V3/localities.geojson"))
 waarnemingen <- readRDS("data/V3/occurrence.rds")
 waarnemingen <-  waarnemingen[waarnemingen$municipality == "Kalmthout" |
                                 waarnemingen$municipality == "Brecht" |
@@ -29,7 +30,6 @@ waarnemingen <- cbind(waarnemingen, jaar, maand, dag, tijd)
 # we sorteren hier Descending, zodat de kleinste bollen bovenaan liggen
 waarnemingen <- waarnemingen[order(-waarnemingen$individualCount),]
 
-waarnemers <-
-  read.csv(file = "data/waarnemers_kalmthout.csv", header = TRUE)
+waarnemers <-  read.csv(file = "data/alle-waarnemers.csv", header = TRUE)
 
 
