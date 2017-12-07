@@ -12,7 +12,7 @@ topoData.df <- as.data.frame(fromJSON(topoData))
 waarnemingen <- readRDS("data/V3/occurrence.rds")
 waarnemingen <-  waarnemingen[which( !is.na(waarnemingen$decimalLatitude), arr.ind=TRUE),]
 waarnemingen <-  waarnemingen[which( !is.na(waarnemingen$decimalLongitude), arr.ind=TRUE),]
-waarnemingen <- jitter(waarnemingen)
+
 #waarnemingen <- head(waarnemingen,10000) 
 # waarnemingen <-  waarnemingen[waarnemingen$municipality == "Kalmthout" |
 #                                 waarnemingen$municipality == "Brecht" |
@@ -154,6 +154,11 @@ server <- function(input, output, session) {
     
     # titel en subtitel
     p <-  p %+% labs(subtitle = locatie,  title = input$soort)
+    p <- p + scale_fill_discrete(
+      breaks=c("1","2","3","4","5","6","7","8","9","10","11","12"), 
+      labels=c("januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september", "oktober", "november", "december")) 
+    
+    
     return(p)
   }
   
