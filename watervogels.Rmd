@@ -1,0 +1,188 @@
+---
+title: "Watervogels"
+author: "gehau"
+date: "December 7, 2017"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+
+
+```
+
+## Watervogels
+
+```{r lees_bestand}
+setwd("/home/gehau/git/watervogels")
+waarnemingen <- readRDS("data/V3/occurrence.rds")
+waarnemingen <-  waarnemingen[which( !is.na(waarnemingen$decimalLatitude), arr.ind=TRUE),]
+waarnemingen <-  waarnemingen[which( !is.na(waarnemingen$decimalLongitude), arr.ind=TRUE),]
+
+
+```
+
+```{r reshape , include=FALSE}
+require(reshape) #om colsplit te gebruiken
+```
+
+```{r transform , warning=FALSE}
+date_split <-
+  colsplit(waarnemingen$eventDate,
+           split = "-",
+           names = c('jaar', 'maand', 'tmp'))
+day_split <-
+  colsplit(date_split$tmp,
+           split = "T",
+           names = c('dag', 'tijd'))
+jaar <- as.character(date_split$jaar)
+maand <- as.character(date_split$maand)
+dag <- as.character(day_split$dag)
+tijd <- as.character(day_split$tijd)
+soort <- waarnemingen$vernacularName
+aantal_individuen <- waarnemingen$individualCount
+waarnemingen <- cbind(waarnemingen, soort, aantal_individuen, jaar, maand, dag, tijd)
+
+wnm <- subset(waarnemingen, select = c(eventID,soort, aantal_individuen,jaar, maand, dag, tijd))
+
+```
+
+```{r ggplot, warning=FALSE}
+# create plot
+    p <- ggplot(data = wnm, aes(x = aantal_individuen))  + theme(axis.text.x = element_text(angle = 60, hjust = 1))
+    
+    # add geom
+    p <- p + geom_histogram() 
+    
+    p <- p + scale_x_log10() 
+    
+    p <- p + aes(fill = maand) 
+    
+    p <- p + scale_fill_discrete(
+      breaks=c("1","2","3","4","5","6","7","8","9","10","11","12"), 
+      labels=c("januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september", "oktober", "november", "december")) 
+    
+    p
+```
+
+
+```{r map, warning=FALSE}
+
+    p <- ggplot(data = wnm, aes(x = jaar, y = aantal_individuen)) + theme(axis.text.x = element_text(angle = 60, hjust = 1))
+    
+    # add geom
+    p <- p + geom_bar(stat = 'identity', width = .5)
+    
+    # update data layer with new mapping
+    p <- p %+% aes(fill = maand)
+    
+     p <- p + scale_fill_discrete(
+      breaks=c("1","2","3","4","5","6","7","8","9","10","11","12"), 
+      labels=c("januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september", "oktober", "november", "december")) 
+    
+    
+    # titel en subtitel
+    p <-  p %+% labs(subtitle = "todo",  title = "Aantal watervogels")
+    p
+```
+
+
+```{r ggplot2, warning=FALSE}
+
+# add facets + fix x-axis
+p + facet_wrap(~maand, scales = 'free_x')
+
+```
+
+
+```{r boxplot}
+
+# create boxplot var
+bp <- ggplot(wnm, aes(x = jaar, y = aantal_individuen, fill = maand)) +
+  geom_boxplot() + scale_y_log10() + theme(axis.text.x = element_text(angle = 60, hjust = 1)) + 
+  scale_fill_discrete(
+      breaks=c("1","2","3","4","5","6","7","8","9","10","11","12"), 
+      labels=c("januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september", "oktober", "november", "december")) + labs(subtitle = "todo",  title = "Aantal watervogels") 
+# boxplot
+bp
+
+# we'll use this a lot  
+fw <- facet_wrap(~maand, scales = 'free_y')
+
+bp + fw
+# 
+# bp.h <- bp %+% aes(x = as.factor(jaar)) 
+# 
+# bp.h + fw
+
+
+```
+
+# Create correlation grid
+
+```{r dplyr , include=FALSE}
+library(dplyr) #
+```
+Top tien van de watervogels
+```{r topTien, warning=FALSE}
+vogelsoorten <- subset(wnm, select = c(soort, aantal_individuen))
+vogelsoorten  %>% 
+  group_by(soort) %>% 
+  summarise(aantal_individuen = sum(aantal_individuen)) %>%
+  arrange(desc(aantal_individuen)) %>% 
+  head(n = 10L)
+```
+
+How correlated is the abundance of different species?
+```{r GGally , include=FALSE}
+# import library
+library(GGally) 
+```
+
+```{r corr, warning=FALSE}
+# create a sample of 1000 obs
+
+sample_wnm <- subset(wnm, select = c(eventID, soort, aantal_individuen, maand)) %>% 
+  spread(soort, aantal_individuen)%>% #spread dplyr
+  subset(select = c(Smient,Kievit,Kokmeeuw,Kuifeend,Tafeleend,Kolgans,maand))
+  
+set.seed(888) 
+#sample_wnm <- sample_wnm[sample(1:nrow(sample_wnm),1000),]
+
+
+# look at correlations
+ggpairs(data=sample_wnm, # data.frame with variables
+        title="Bird species occurence correlations") + theme(axis.text.x = element_text(angle = 60, hjust = 1)) 
+```
+
+```{r add alpha and trendline, warning=FALSE}
+
+ggpairs(data = sample_wnm, 
+        lower = list(continuous = wrap("smooth", alpha=1/5, shape = I('.'), 
+                                       colour ='blue')),
+         title="Bird species occurence correlations") + theme(axis.text.x = element_text(angle = 60, hjust = 1))
+
+
+
+
+```
+
+
+```{r line plot}
+
+
+# create line plot
+p <- ggplot( waarnemingen[waarnemingen$municipality == "Kalmthout",], aes(verbatimEventDate, individualCount)) +
+              geom_line(colour = 'darkgrey') + scale_y_log10() #+ theme(axis.text.x = element_text(angle = 60, hjust = 1))
+
+
+# change default grouping
+p <- p %+% aes(group = vernacularName)
+p + facet_wrap(~jaar, scales = 'free_x')
+
+
+```

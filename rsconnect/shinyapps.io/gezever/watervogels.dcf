@@ -1,0 +1,13 @@
+name: watervogels
+title: watervogels
+username:
+account: gezever
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 236152
+bundleId: 1192492
+url: https://gezever.shinyapps.io/watervogels/
+when: 1516888598.46195
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: geo.R|watervogels.R

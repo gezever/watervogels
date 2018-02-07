@@ -226,7 +226,7 @@ server <- function(input, output, session) {
     proxy %>% clearGeoJSON()
     if (input$natuurgebieden) {
       proxy %>% 
-        addGeoJSON(topoData,  weight = 1,   color = "#cc3300", fill = TRUE) 
+        addGeoJSON(topoData,  weight = 1,   color = "#009900", fill = TRUE) 
     }
   })
   
